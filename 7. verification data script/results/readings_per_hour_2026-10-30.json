@@ -1,0 +1,33 @@
+{
+ "run_date": "2026-10-30",
+ "script": "7. verification data script/readings_per_hour.py",
+ "streams": {
+  "heart_rate": {
+   "hours": 485951,
+   "median": 45.0,
+   "q1": 36.0,
+   "q3": 52.0,
+   "share_ge3_pct": 99.37,
+   "share_ge30_pct": 88.08,
+   "share_ge60_pct": 0.22
+  },
+  "respiratory_rate": {
+   "hours": 487770,
+   "median": 53.0,
+   "q1": 41.0,
+   "q3": 59.0,
+   "share_ge3_pct": 99.1,
+   "share_ge30_pct": 87.67,
+   "share_ge60_pct": 24.43
+  },
+  "spo2": {
+   "hours": 73001,
+   "median": 51.0,
+   "q1": 28.0,
+   "q3": 59.0,
+   "share_ge3_pct": 89.47,
+   "share_ge30_pct": 73.47,
+   "share_ge60_pct": 18.64
+  }
+ }
+}

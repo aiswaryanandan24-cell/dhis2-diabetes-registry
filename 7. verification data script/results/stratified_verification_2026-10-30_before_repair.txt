@@ -1,0 +1,63 @@
+Participants in the registry: 2280
+
+Counting live events per hourly group for proportional allocation
+  wearable: 1525799 events
+  glucose: 519617 events
+  environmental: 4305422 events
+
+[run] diagnosis, all participants (limit None)
+[done] diagnosis: {'values_compared': 24750, 'matched': 24750, 'empty_as_expected': 0, 'empty_as_expected_by_field': {}, 'mismatched': 0, 'events_with_no_source_hour': 0, 'source_hours_with_no_event': 0, 'discrepancies': 0, 'agreement_pct': 100.0, 'participants_sampled': 'all', 'participants_with_records': 2189, 'elapsed_seconds': 57}
+
+[run] retinal_photography, all participants (limit None)
+[done] retinal_photography: {'values_compared': 939200, 'matched': 936971, 'empty_as_expected': 0, 'empty_as_expected_by_field': {}, 'mismatched': 2229, 'events_with_no_source_hour': 0, 'source_hours_with_no_event': 0, 'discrepancies': 2229, 'agreement_pct': 99.7627, 'participants_sampled': 'all', 'participants_with_records': 2275, 'elapsed_seconds': 77}
+       2229 mismatches written to stratified_sample_mismatches.json
+
+[run] retinal_octa, all participants (limit None)
+[done] retinal_octa: {'values_compared': 368400, 'matched': 368360, 'empty_as_expected': 0, 'empty_as_expected_by_field': {}, 'mismatched': 40, 'events_with_no_source_hour': 0, 'source_hours_with_no_event': 0, 'discrepancies': 40, 'agreement_pct': 99.9891, 'participants_sampled': 'all', 'participants_with_records': 2264, 'elapsed_seconds': 63}
+       40 mismatches written to stratified_sample_mismatches.json
+
+[run] ecg, all participants (limit None)
+[done] ecg: {'values_compared': 63197, 'matched': 58767, 'empty_as_expected': 4429, 'empty_as_expected_by_field': {'ECG Finding 2': 659, 'ECG Finding 2 Detail': 659, 'ECG Finding 3': 1490, 'ECG Finding 3 Detail': 1490, 'ECG P Axis (deg)': 45, 'ECG PR Interval (ms)': 38, 'ECG PR Interval Status': 38, 'ECG T Axis (deg)': 10}, 'mismatched': 0, 'events_with_no_source_hour': 1, 'source_hours_with_no_event': 0, 'discrepancies': 1, 'agreement_pct': 99.9984, 'participants_sampled': 'all', 'participants_with_records': 2251, 'elapsed_seconds': 55}
+
+[run] wearable, n=481
+[done] wearable: {'values_compared': 1319652, 'matched': 1319652, 'empty_as_expected': 0, 'empty_as_expected_by_field': {}, 'mismatched': 0, 'events_with_no_source_hour': 0, 'source_hours_with_no_event': 0, 'discrepancies': 0, 'agreement_pct': 100.0, 'participants_sampled': 481, 'seed': 2368121044, 'elapsed_seconds': 280}
+
+[run] glucose, n=164
+[done] glucose: {'values_compared': 379480, 'matched': 379334, 'empty_as_expected': 146, 'empty_as_expected_by_field': {'max': 27, 'mean': 27, 'min': 27, 'sd': 65}, 'mismatched': 0, 'events_with_no_source_hour': 0, 'source_hours_with_no_event': 0, 'discrepancies': 0, 'agreement_pct': 100.0, 'participants_sampled': 164, 'seed': 345734204, 'elapsed_seconds': 18}
+
+[run] environmental, n=1356
+[done] environmental: {'values_compared': 12931395, 'matched': 12931333, 'empty_as_expected': 62, 'empty_as_expected_by_field': {'sd': 62}, 'mismatched': 0, 'events_with_no_source_hour': 0, 'source_hours_with_no_event': 0, 'discrepancies': 0, 'agreement_pct': 100.0, 'participants_sampled': 1356, 'seed': 3202671363, 'elapsed_seconds': 5317}
+
+========================================================================
+VERIFICATION
+  method: hourly groups: stratified random sampling without replacement, proportional to live event counts across the hourly groups, target 2000 participants, floor 50 per group, independent seed per group derived from base seed 42; per-record groups: every participant, every event, every mapped field; tolerance 0.01; an empty pair counts as agreement only where a rule on the source says the value must be empty, and is reported separately; events with no source record and source records with no event are counted separately
+  elapsed this session: 5867s
+
+  group                   compared   matched  empty ok  mismatch  no source  no event    agree
+  diagnosis                  24750     24750         0         0          0         0  100.00%
+  retinal_photography       939200    936971         0      2229          0         0   99.76%
+  retinal_octa              368400    368360         0        40          0         0   99.99%
+  ecg                        63197     58767      4429         0          1         0  100.00%
+  wearable                 1319652   1319652         0         0          0         0  100.00%
+  glucose                   379480    379334       146         0          0         0  100.00%
+  environmental           12931395  12931333        62         0          0         0  100.00%
+
+  Values compared: 16026074
+  Discrepancies:   2270
+  Agreement:       99.9858%
+  empty as expected, ecg: {'ECG Finding 2': 659, 'ECG Finding 2 Detail': 659, 'ECG Finding 3': 1490, 'ECG Finding 3 Detail': 1490, 'ECG P Axis (deg)': 45, 'ECG PR Interval (ms)': 38, 'ECG PR Interval Status': 38, 'ECG T Axis (deg)': 10}
+  empty as expected, glucose: {'max': 27, 'mean': 27, 'min': 27, 'sd': 65}
+  empty as expected, environmental: {'sd': 62}
+
+MISMATCH BREAKDOWN (from stratified_sample_mismatches.json)
+  retinal_photography   preview                           empty on one side                     2229
+  retinal_octa          preview                           empty on one side                       40
+
+Results written to /home/jupyter-saptpurk/dhis2-diabetes-registry/7. verification data script/results/stratified_verification_2026-10-30.json
+
+PRIOR CORE REGISTRY RESULT, not re-verified by this run
+  values: 82302
+  discrepancies: 0
+  method: exhaustive, all values, established in an earlier project phase
+  This figure comes from an earlier phase. Do not add it to the sampled totals above: doing so folds an assumed 100% into a measured rate.
+========================================================================

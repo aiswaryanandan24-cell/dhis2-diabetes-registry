@@ -1,0 +1,152 @@
+{
+ "run_date": "2026-10-30",
+ "script": "7. verification data script/stratified_sample_verification.py",
+ "dhis2_version": "2.44-SNAPSHOT",
+ "method": "hourly groups: stratified random sampling without replacement, proportional to live event counts across the hourly groups, target 2000 participants, floor 50 per group, independent seed per group derived from base seed 42; per-record groups: every participant, every event, every mapped field; tolerance 0.01; an empty pair counts as agreement only where a rule on the source says the value must be empty, and is reported separately; events with no source record and source records with no event are counted separately",
+ "results": {
+  "diagnosis": {
+   "values_compared": 24750,
+   "matched": 24750,
+   "empty_as_expected": 0,
+   "empty_as_expected_by_field": {},
+   "mismatched": 0,
+   "events_with_no_source_hour": 0,
+   "source_hours_with_no_event": 0,
+   "discrepancies": 0,
+   "agreement_pct": 100.0,
+   "participants_sampled": "all",
+   "participants_with_records": 2189,
+   "elapsed_seconds": 57
+  },
+  "retinal_photography": {
+   "values_compared": 939200,
+   "matched": 936971,
+   "empty_as_expected": 0,
+   "empty_as_expected_by_field": {},
+   "mismatched": 2229,
+   "events_with_no_source_hour": 0,
+   "source_hours_with_no_event": 0,
+   "discrepancies": 2229,
+   "agreement_pct": 99.7627,
+   "participants_sampled": "all",
+   "participants_with_records": 2275,
+   "elapsed_seconds": 77
+  },
+  "retinal_octa": {
+   "values_compared": 368400,
+   "matched": 368360,
+   "empty_as_expected": 0,
+   "empty_as_expected_by_field": {},
+   "mismatched": 40,
+   "events_with_no_source_hour": 0,
+   "source_hours_with_no_event": 0,
+   "discrepancies": 40,
+   "agreement_pct": 99.9891,
+   "participants_sampled": "all",
+   "participants_with_records": 2264,
+   "elapsed_seconds": 63
+  },
+  "ecg": {
+   "values_compared": 63197,
+   "matched": 58767,
+   "empty_as_expected": 4429,
+   "empty_as_expected_by_field": {
+    "ECG Finding 2": 659,
+    "ECG Finding 2 Detail": 659,
+    "ECG Finding 3": 1490,
+    "ECG Finding 3 Detail": 1490,
+    "ECG P Axis (deg)": 45,
+    "ECG PR Interval (ms)": 38,
+    "ECG PR Interval Status": 38,
+    "ECG T Axis (deg)": 10
+   },
+   "mismatched": 0,
+   "events_with_no_source_hour": 1,
+   "source_hours_with_no_event": 0,
+   "discrepancies": 1,
+   "agreement_pct": 99.9984,
+   "participants_sampled": "all",
+   "participants_with_records": 2251,
+   "elapsed_seconds": 55
+  },
+  "wearable": {
+   "values_compared": 1319652,
+   "matched": 1319652,
+   "empty_as_expected": 0,
+   "empty_as_expected_by_field": {},
+   "mismatched": 0,
+   "events_with_no_source_hour": 0,
+   "source_hours_with_no_event": 0,
+   "discrepancies": 0,
+   "agreement_pct": 100.0,
+   "participants_sampled": 481,
+   "seed": 2368121044,
+   "elapsed_seconds": 280
+  },
+  "glucose": {
+   "values_compared": 379480,
+   "matched": 379334,
+   "empty_as_expected": 146,
+   "empty_as_expected_by_field": {
+    "max": 27,
+    "mean": 27,
+    "min": 27,
+    "sd": 65
+   },
+   "mismatched": 0,
+   "events_with_no_source_hour": 0,
+   "source_hours_with_no_event": 0,
+   "discrepancies": 0,
+   "agreement_pct": 100.0,
+   "participants_sampled": 164,
+   "seed": 345734204,
+   "elapsed_seconds": 18
+  },
+  "environmental": {
+   "values_compared": 12931395,
+   "matched": 12931333,
+   "empty_as_expected": 62,
+   "empty_as_expected_by_field": {
+    "sd": 62
+   },
+   "mismatched": 0,
+   "events_with_no_source_hour": 0,
+   "source_hours_with_no_event": 0,
+   "discrepancies": 0,
+   "agreement_pct": 100.0,
+   "participants_sampled": 1356,
+   "seed": 3202671363,
+   "elapsed_seconds": 5317
+  }
+ },
+ "totals": {
+  "values_compared": 16026074,
+  "matched": 16019167,
+  "empty_as_expected": 4637,
+  "mismatched": 2269,
+  "events_with_no_source_hour": 1,
+  "source_hours_with_no_event": 0,
+  "discrepancies": 2270,
+  "agreement_pct": 99.9858
+ },
+ "mismatch_breakdown": [
+  {
+   "group": "retinal_photography",
+   "field": "preview",
+   "kind": "empty on one side",
+   "count": 2229
+  },
+  {
+   "group": "retinal_octa",
+   "field": "preview",
+   "kind": "empty on one side",
+   "count": 40
+  }
+ ],
+ "prior_core_registry_result": {
+  "values": 82302,
+  "discrepancies": 0,
+  "method": "exhaustive, all values, established in an earlier project phase",
+  "verified_by_this_script": false
+ }
+}

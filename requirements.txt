@@ -11,6 +11,11 @@ numpy>=1.24,<3
 pydicom>=2.4,<4
 pylibjpeg>=2.0
 pylibjpeg-libjpeg>=2.0
+# 2,229 Topcon Maestro2 infrared images wrap their JPEG 2000 codestream in a
+# JP2 file header, which DICOM does not permit. Pillow rejects them with
+# "broken data stream"; OpenJPEG decodes them. Without this package those
+# images get no preview.
+pylibjpeg-openjpeg>=2.0
 Pillow>=10.0
 
 # Strips notebook outputs on commit. Run once per clone:

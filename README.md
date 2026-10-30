@@ -51,6 +51,7 @@ Notebook outputs in this repository have held participant rows before, and
 | `5. diagnosis/` | Diagnosis history from OMOP `condition_occurrence.csv`. |
 | `6. retinal imaging and OCTA/` | Retinal photography and OCTA, with DICOM previews uploaded as file resources. |
 | `7. verification data script/` | Read-only checks of imported values against the source files. |
+| `metadata/` | The whole program as one importable metadata package. |
 
 Folder names are numbered in the order they were built, not the order you run
 them. See below for the run order.
@@ -115,9 +116,43 @@ python3 "6. retinal imaging and OCTA/retinal_step2_import_full.py" --all
 
 # 7. Verify. Writes stratified_sample_checkpoint.json (per-group counts) and
 #    stratified_sample_mismatches.json (every mismatch with its stage,
-#    participant, hour, field and both values) next to the script, and
-#    prints a breakdown by field and kind at the end. --fresh clears both.
-python3 "7. verification data script/stratified_sample_verification.py"
+#    participant, hour, field and both values) to the working directory,
+#    prints a breakdown by field and kind at the end, and on a full run
+#    writes the dated aggregate counts to results/. --fresh clears both.
+#    Hourly groups are sampled; the per-record groups are checked in full.
+cd "7. verification data script"
+python3 stratified_sample_verification.py --fresh
+
+# 7b. Independent check of the glucose aggregation against the iglu R
+#     package. Needs R with iglu; see the script's docstring for the install.
+python3 cgm_iglu_crosscheck.py
+
+# 7c. Readings behind each heart rate, respiration and SpO2 hour, from the
+#     source files only, to put the three-reading sufficiency bar in context.
+python3 readings_per_hour.py
+cd ..
+```
+
+## Recreating the program on another instance
+
+`metadata/diabetes_registry_program.json` is the complete program exported
+from the live server: all 27 stages, 445 data elements, the option sets, the
+ten attributes, the Person tracked entity type and the four organisation
+units (an "AI-READI Study" root with the three sites). Account references and
+edit timestamps are stripped, and every reference resolves within the file.
+Import it in the Import/Export app or with
+
+```bash
+curl -u USER -H "Content-Type: application/json" -X POST \
+  "$DHIS2_URL/api/metadata?importStrategy=CREATE_AND_UPDATE&atomicMode=ALL" \
+  --data-binary @metadata/diabetes_registry_program.json
+```
+
+Identifiers are preserved, so every script here works against the new
+instance unchanged. Regenerate the file after any change to the program:
+
+```bash
+python3 "1. core registry/export_program_metadata.py"
 ```
 
 The long imports are meant to run detached:
@@ -167,11 +202,22 @@ says so in the per-participant line.
 in `stratified_sample_verification.py` appends each mismatch with its
 group, stage, participant, hour, field, both values and the source hour's
 reading count to `stratified_sample_mismatches.json`, and the run ends
-with a breakdown by field and kind (`values differ` versus `undefined on
-both sides`). A match rate on its own cannot be explained; the file is
-what lets a discrepancy be traced to its cause without re-running the
-source aggregation. It holds participant-level values, so it is
-gitignored; the counts go in `results/`.
+with a breakdown by field and kind. A match rate on its own cannot be
+explained; the file is what lets a discrepancy be traced to its cause
+without re-running the source aggregation. It holds participant-level
+values, so it is gitignored; the counts go in `results/`.
+
+**An empty pair is agreement only where the source says it must be empty.**
+A standard deviation over fewer than two readings, the mean of a glucose
+hour holding only High/Low markers, a field the source record does not
+carry: those pairs count as `empty_as_expected`, reported in their own
+column. Anywhere else two blanks are a mismatch, since a parser returning
+None for a populated field produces exactly that.
+
+**The hourly check shares the importer's aggregation code.** It proves the
+registry holds what that code computed, not that the code is right.
+`cgm_iglu_crosscheck.py` re-derives the glucose summaries from the raw
+files with iglu and compares them with what is stored.
 
 **Checkpoints record outcomes.** `common.checkpoint.Checkpoint` marks a
 participant done only after a confirmed write, and records failures so the
@@ -193,6 +239,10 @@ an exact-match re-run looks like.
 environment CSVs carry no suffix but are UTC too. Both were confirmed by
 diurnal check, described in `common/timeutil.py`. Compare hours with
 `hour_key`, which compares instants, never by slicing formatted strings.
+The server also runs in UTC, so Capture shows UTC clock times. For a local
+view, take the site from the event's organisation unit (UAB is
+America/Chicago, UCSD and UW are America/Los_Angeles); every site is a whole
+number of hours from UTC, so each stored hour is exactly one local hour.
 
 **Option set values are codes, not names.** Build them with
 `common.dhis2.option_value(option_set_name, display_name)`. DHIS2 validates

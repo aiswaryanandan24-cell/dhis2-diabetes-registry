@@ -1,0 +1,94 @@
+{
+ "run_date": "2026-10-30",
+ "script": "7. verification data script/cgm_iglu_crosscheck.py",
+ "iglu_version": "4.2.2",
+ "participants_sampled": 200,
+ "seed": 2316574721,
+ "hours_in_source": 46421,
+ "hours_in_registry": 46421,
+ "source_hours_with_no_event": 0,
+ "events_with_no_source_hour": 0,
+ "per_metric": {
+  "mean": {
+   "compared": 46421,
+   "agree": 46258,
+   "empty_as_expected": 163,
+   "mismatch": 0,
+   "agreement_pct": 100.0
+  },
+  "min": {
+   "compared": 46421,
+   "agree": 46258,
+   "empty_as_expected": 163,
+   "mismatch": 0,
+   "agreement_pct": 100.0
+  },
+  "max": {
+   "compared": 46421,
+   "agree": 46258,
+   "empty_as_expected": 163,
+   "mismatch": 0,
+   "agreement_pct": 100.0
+  },
+  "sd": {
+   "compared": 46421,
+   "agree": 46187,
+   "empty_as_expected": 234,
+   "mismatch": 0,
+   "agreement_pct": 100.0
+  },
+  "tir_pct": {
+   "compared": 46421,
+   "agree": 46421,
+   "empty_as_expected": 0,
+   "mismatch": 0,
+   "agreement_pct": 100.0
+  },
+  "tar_pct": {
+   "compared": 46421,
+   "agree": 46421,
+   "empty_as_expected": 0,
+   "mismatch": 0,
+   "agreement_pct": 100.0
+  },
+  "tbr_pct": {
+   "compared": 46421,
+   "agree": 46421,
+   "empty_as_expected": 0,
+   "mismatch": 0,
+   "agreement_pct": 100.0
+  },
+  "count": {
+   "compared": 46421,
+   "agree": 46421,
+   "empty_as_expected": 0,
+   "mismatch": 0,
+   "agreement_pct": 100.0
+  },
+  "high_count": {
+   "compared": 46421,
+   "agree": 46421,
+   "empty_as_expected": 0,
+   "mismatch": 0,
+   "agreement_pct": 100.0
+  },
+  "low_count": {
+   "compared": 46421,
+   "agree": 46421,
+   "empty_as_expected": 0,
+   "mismatch": 0,
+   "agreement_pct": 100.0
+  }
+ },
+ "sd_definition": {
+  "registry": "population standard deviation (divisor n)",
+  "iglu": "sample standard deviation (divisor n - 1)",
+  "relative_gap_median": 0.0426,
+  "relative_gap_iqr": [
+   0.0423,
+   0.043
+  ],
+  "hours_where_definitions_differ_by_more_than_0.01": 46174
+ },
+ "method": "raw Dexcom readings parsed independently of the importer, bucketed by UTC hour with pandas; mean, minimum, maximum and sample SD by iglu on numeric readings; time in, above and below range by iglu with High as 401 and Low as 39 mg/dL; counts by pandas; stored SD compared with the iglu SD rescaled to the population definition; an empty pair counts as agreement and is reported separately"
+}

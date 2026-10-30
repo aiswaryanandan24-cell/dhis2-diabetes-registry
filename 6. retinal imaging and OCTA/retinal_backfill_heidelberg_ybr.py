@@ -7,8 +7,15 @@
      YBR_FULL_422 pixel data being treated as RGB. Photography only, since
      the OCTA en-face files are all MONOCHROME2.
 
-Events whose source file is genuinely corrupt, reported as "broken data
-stream", are deliberately left alone.
+  3. With --missing-only, ANY event with an empty preview, whatever the
+     vendor, and nothing else. Added in October 2026, when exhaustive
+     verification found 2,229 Topcon Maestro2 infrared photographs without
+     one. They are not corrupt, as "broken data stream" suggested: their
+     JPEG 2000 codestream sits inside a JP2 file header, which DICOM does not
+     permit, and Pillow rejects that while OpenJPEG decodes it. Install
+     pylibjpeg-openjpeg (now in requirements.txt) before running this mode.
+
+A file that still fails to convert is recorded as failed and left alone.
 
 WHAT THE AUDIT FOUND, and what changed
 ---------------------------------------
@@ -53,6 +60,8 @@ from common.checkpoint import Checkpoint  # noqa: E402
 
 CHECKPOINT_FULL = "retinal_backfill_heidelberg_ybr_checkpoint.json"
 CHECKPOINT_PILOT = "retinal_backfill_heidelberg_ybr_checkpoint_PILOT.json"
+CHECKPOINT_MISSING = "retinal_backfill_missing_preview_checkpoint.json"
+CHECKPOINT_MISSING_PILOT = "retinal_backfill_missing_preview_checkpoint_PILOT.json"
 
 YBR_MANUFACTURERS = {"Optomed", "iCare"}
 HEIDELBERG = "Heidelberg"
@@ -96,8 +105,12 @@ def fetch_tracked_entities(session, org_unit_uid, person_id=None):
     ]
 
 
-def classify(events, field_uids, path_key, allow_ybr):
-    """Events needing a rebuilt preview, with the source path to rebuild from."""
+def classify(events, field_uids, path_key, allow_ybr, any_vendor=False):
+    """Events needing a rebuilt preview, with the source path to rebuild from.
+
+    any_vendor treats an empty preview as missing whoever made the camera;
+    without it only Heidelberg events qualify, as in the original backfill.
+    """
     manufacturer_de = field_uids["manufacturer"]
     preview_de = field_uids["preview"]
     path_de = field_uids[path_key]
@@ -114,6 +127,8 @@ def classify(events, field_uids, path_key, allow_ybr):
 
         if manufacturer == HEIDELBERG and not preview:
             reason = "heidelberg_missing"
+        elif any_vendor and not preview:
+            reason = "preview_missing"
         elif allow_ybr and manufacturer in YBR_MANUFACTURERS:
             reason = "ybr_miscolor"
         else:
@@ -129,10 +144,10 @@ def classify(events, field_uids, path_key, allow_ybr):
 
 
 def process_stage(session, stage_name, stage_uid, field_uids, path_key,
-                  allow_ybr, modality, tei_uids, checkpoint):
+                  allow_ybr, modality, tei_uids, checkpoint, any_vendor=False):
     print(f"\nScanning {stage_name} across {len(tei_uids)} participant(s)")
     preview_de = field_uids["preview"]
-    counts = {"heidelberg_missing": 0, "ybr_miscolor": 0}
+    counts = {"heidelberg_missing": 0, "preview_missing": 0, "ybr_miscolor": 0}
     fixed = 0
 
     for index, tei_uid in enumerate(tei_uids, start=1):
@@ -140,7 +155,7 @@ def process_stage(session, stage_name, stage_uid, field_uids, path_key,
         # silently truncated.
         events = dhis2.fetch_events(session, M.PROGRAM_UID, stage_uid, tei_uid)
 
-        for item in classify(events, field_uids, path_key, allow_ybr):
+        for item in classify(events, field_uids, path_key, allow_ybr, any_vendor):
             event_uid = item["event"]["event"]
             if checkpoint.is_done(event_uid):
                 continue
@@ -199,6 +214,7 @@ def process_stage(session, stage_name, stage_uid, field_uids, path_key,
         if index % 200 == 0 or index == len(tei_uids):
             print(f"  {index}/{len(tei_uids)} scanned, "
                   f"{counts['heidelberg_missing']} Heidelberg + "
+                  f"{counts['preview_missing']} other missing + "
                   f"{counts['ybr_miscolor']} YBR found, {fixed} fixed, "
                   f"{len(checkpoint.failed)} failed")
 
@@ -210,6 +226,9 @@ def main():
     parser.add_argument("--person-id", help="pilot run against one participant")
     parser.add_argument("--skip-octa", action="store_true",
                         help="photography only, if the en-face path field is absent")
+    parser.add_argument("--missing-only", action="store_true",
+                        help="rebuild every empty preview, any vendor, and leave "
+                             "the YBR colour fix alone")
     args, _ = parser.parse_known_args()
 
     session = dhis2.get_session()
@@ -226,15 +245,21 @@ def main():
 
     org_unit = resolve_org_unit(session)
     tei_uids = fetch_tracked_entities(session, org_unit, args.person_id)
-    checkpoint_file = CHECKPOINT_PILOT if args.person_id else CHECKPOINT_FULL
+    if args.missing_only:
+        checkpoint_file = CHECKPOINT_MISSING_PILOT if args.person_id else CHECKPOINT_MISSING
+    else:
+        checkpoint_file = CHECKPOINT_PILOT if args.person_id else CHECKPOINT_FULL
+    allow_ybr = not args.missing_only
     print(f"{'PILOT' if args.person_id else 'FULL COHORT'} mode, "
+          f"{'missing previews only, ' if args.missing_only else ''}"
           f"{len(tei_uids)} participant(s), checkpoint {checkpoint_file}")
 
     start = time.time()
     with Checkpoint(checkpoint_file, flush_every=25) as checkpoint:
         process_stage(
             session, "Retinal Photography", photo_stage, photo_fields,
-            "filepath", True, "retinal_photography", tei_uids, checkpoint,
+            "filepath", allow_ybr, "retinal_photography", tei_uids, checkpoint,
+            any_vendor=args.missing_only,
         )
 
         if args.skip_octa:
@@ -251,6 +276,7 @@ def main():
             process_stage(
                 session, "Retinal OCTA", octa_stage, octa_fields,
                 "enface_file_path", False, "retinal_octa", tei_uids, checkpoint,
+                any_vendor=args.missing_only,
             )
 
     print(f"\nDone in {(time.time() - start) / 60:.1f} min. {checkpoint.summary()}")
