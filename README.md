@@ -95,6 +95,10 @@ python3 "2. wearable script/glucose_recount_step1_metadata.py"
 python3 "2. wearable script/glucose_recount_step2_backfill.py"
 python3 "2. wearable script/threshold_step1_metadata.py"
 python3 "2. wearable script/threshold_step2_backfill.py"
+# One-off repair, October 2026: the Garmin export repeats 30% of sleep
+# segments verbatim. The loader now drops them; this removes the copies an
+# earlier load stored. Dry run first.
+python3 "2. wearable script/sleep_dedupe_repair.py" --dry-run
 
 # 3. ECG
 python3 "3. ecg/ecg_step1_metadata.py"
@@ -103,6 +107,9 @@ python3 "3. ecg/ecg_step2_import.py"
 # 4. Environment
 python3 "4. envt/env_step1_metadata_v2.py"
 python3 "4. envt/env_step2_import.py"
+# One-off repair, October 2026: fills humidity flagged-time lists that an
+# early load left empty when they ran past about 7,100 characters.
+python3 "4. envt/humidity_timestamp_repair.py" --dry-run
 
 # 5. Diagnosis
 python3 "5. diagnosis/diagnosis_step1_metadata.py"
@@ -113,15 +120,20 @@ python3 "6. retinal imaging and OCTA/retinal_step1_metadata.py"
 python3 "6. retinal imaging and OCTA/retinal_step3_add_enface_path.py"
 python3 "6. retinal imaging and OCTA/retinal_step2_import.py" --person-id 1072
 python3 "6. retinal imaging and OCTA/retinal_step2_import_full.py" --all
+# Rebuild any preview the import could not make (needs pylibjpeg-openjpeg
+# for the Topcon infrared JPEG 2000 files). Leaves the YBR colour fix alone.
+python3 "6. retinal imaging and OCTA/retinal_backfill_heidelberg_ybr.py" --missing-only
 
 # 7. Verify. Writes stratified_sample_checkpoint.json (per-group counts) and
 #    stratified_sample_mismatches.json (every mismatch with its stage,
 #    participant, hour, field and both values) to the working directory,
 #    prints a breakdown by field and kind at the end, and on a full run
 #    writes the dated aggregate counts to results/. --fresh clears both.
-#    Hourly groups are sampled; the per-record groups are checked in full.
+#    Every stored field of every stage is compared. --exhaustive checks every
+#    participant; without it the hourly groups are sampled (2,000 participants,
+#    floor of 50 per group) and the per-record groups are still checked in full.
 cd "7. verification data script"
-python3 stratified_sample_verification.py --fresh
+python3 stratified_sample_verification.py --fresh --exhaustive
 
 # 7b. Independent check of the glucose aggregation against the iglu R
 #     package. Needs R with iglu; see the script's docstring for the install.
@@ -130,6 +142,10 @@ python3 cgm_iglu_crosscheck.py
 # 7c. Readings behind each heart rate, respiration and SpO2 hour, from the
 #     source files only, to put the three-reading sufficiency bar in context.
 python3 readings_per_hour.py
+
+# 7d. How often each reference-range status fires, CGM wear lengths, and a
+#     worked count of glucose hours below 70% time in range by site.
+python3 flags_and_wear_summary.py
 cd ..
 ```
 

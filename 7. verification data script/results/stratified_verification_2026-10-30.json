@@ -2,89 +2,189 @@
  "run_date": "2026-10-30",
  "script": "7. verification data script/stratified_sample_verification.py",
  "dhis2_version": "2.44-SNAPSHOT",
- "method": "hourly groups: stratified random sampling without replacement, proportional to live event counts across the hourly groups, target 2000 participants, floor 50 per group, independent seed per group derived from base seed 42; per-record groups: every participant, every event, every mapped field; tolerance 0.01; an empty pair counts as agreement only where a rule on the source says the value must be empty, and is reported separately; events with no source record and source records with no event are counted separately",
+ "method": "hourly groups: every participant, every event, every stored field; per-record groups: every participant, every event, every mapped field; tolerance 0.01; an empty pair counts as agreement only where a rule on the source says the value must be empty, and is reported separately; events with no source record and source records with no event are counted separately",
  "results": {
+  "glucose": {
+   "values_compared": 8313872,
+   "matched": 7365732,
+   "empty_as_expected": 948140,
+   "mismatched": 0,
+   "events_with_no_source_hour": 0,
+   "source_hours_with_no_event": 0,
+   "discrepancies": 0,
+   "participants_with_records": 2245,
+   "flagged_time_lists_stored_uncapped": 0,
+   "source_records_repeated": 0,
+   "elapsed_seconds": 350,
+   "participants_sampled": "all",
+   "empty_as_expected_by_field": {
+    "above_ts": 428562,
+    "below_ts": 509537,
+    "max": 2327,
+    "mean": 2327,
+    "min": 2327,
+    "sd": 3060
+   },
+   "by_stage": {
+    "CGM - Glucose": {
+     "compared": 8313872,
+     "matched": 7365732,
+     "empty_as_expected": 948140,
+     "mismatched": 0,
+     "no_source": 0,
+     "no_event": 0,
+     "fields_compared": [
+      "above_count",
+      "above_ts",
+      "below_count",
+      "below_ts",
+      "count",
+      "high_count",
+      "hour_end",
+      "hour_start",
+      "low_count",
+      "max",
+      "mean",
+      "min",
+      "sd",
+      "tar_pct",
+      "tbr_pct",
+      "tir_pct"
+     ]
+    }
+   },
+   "agreement_pct": 100.0,
+   "shards": 8
+  },
   "diagnosis": {
    "values_compared": 24750,
    "matched": 24750,
    "empty_as_expected": 0,
-   "empty_as_expected_by_field": {},
    "mismatched": 0,
    "events_with_no_source_hour": 0,
    "source_hours_with_no_event": 0,
    "discrepancies": 0,
-   "agreement_pct": 100.0,
-   "participants_sampled": "all",
    "participants_with_records": 2189,
-   "elapsed_seconds": 57
-  },
-  "wearable": {
-   "values_compared": 1319652,
-   "matched": 1319652,
-   "empty_as_expected": 0,
+   "flagged_time_lists_stored_uncapped": 0,
+   "source_records_repeated": 0,
+   "elapsed_seconds": 51,
+   "participants_sampled": "all",
    "empty_as_expected_by_field": {},
-   "mismatched": 0,
-   "events_with_no_source_hour": 0,
-   "source_hours_with_no_event": 0,
-   "discrepancies": 0,
-   "agreement_pct": 100.0,
-   "participants_sampled": 481,
-   "seed": 2368121044,
-   "elapsed_seconds": 280
-  },
-  "glucose": {
-   "values_compared": 379480,
-   "matched": 379334,
-   "empty_as_expected": 146,
-   "empty_as_expected_by_field": {
-    "max": 27,
-    "mean": 27,
-    "min": 27,
-    "sd": 65
+   "by_stage": {
+    "diagnosis": {
+     "compared": 24750,
+     "matched": 24750,
+     "empty_as_expected": 0,
+     "mismatched": 0,
+     "no_source": 0,
+     "no_event": 0,
+     "fields_compared": [
+      "date",
+      "label"
+     ]
+    }
    },
-   "mismatched": 0,
-   "events_with_no_source_hour": 0,
-   "source_hours_with_no_event": 0,
-   "discrepancies": 0,
    "agreement_pct": 100.0,
-   "participants_sampled": 164,
-   "seed": 345734204,
-   "elapsed_seconds": 18
-  },
-  "environmental": {
-   "values_compared": 12931395,
-   "matched": 12931333,
-   "empty_as_expected": 62,
-   "empty_as_expected_by_field": {
-    "sd": 62
-   },
-   "mismatched": 0,
-   "events_with_no_source_hour": 0,
-   "source_hours_with_no_event": 0,
-   "discrepancies": 0,
-   "agreement_pct": 100.0,
-   "participants_sampled": 1356,
-   "seed": 3202671363,
-   "elapsed_seconds": 5317
+   "shards": 8
   },
   "retinal_photography": {
    "values_compared": 939200,
    "matched": 939200,
    "empty_as_expected": 0,
-   "empty_as_expected_by_field": {},
    "mismatched": 0,
    "events_with_no_source_hour": 0,
    "source_hours_with_no_event": 0,
    "discrepancies": 0,
-   "agreement_pct": 100.0,
-   "participants_sampled": "all",
    "participants_with_records": 2275,
-   "elapsed_seconds": 71
+   "flagged_time_lists_stored_uncapped": 0,
+   "source_records_repeated": 0,
+   "elapsed_seconds": 72,
+   "participants_sampled": "all",
+   "empty_as_expected_by_field": {},
+   "by_stage": {
+    "retinal_photography": {
+     "compared": 939200,
+     "matched": 939200,
+     "empty_as_expected": 0,
+     "mismatched": 0,
+     "no_source": 0,
+     "no_event": 0,
+     "fields_compared": [
+      "anatomic_region",
+      "color_channel_dimension",
+      "filepath",
+      "height",
+      "imaging",
+      "laterality",
+      "manufacturer",
+      "manufacturers_model_name",
+      "preview",
+      "width"
+     ]
+    }
+   },
+   "agreement_pct": 100.0,
+   "shards": 8
+  },
+  "retinal_octa": {
+   "values_compared": 368400,
+   "matched": 368360,
+   "empty_as_expected": 40,
+   "mismatched": 0,
+   "events_with_no_source_hour": 0,
+   "source_hours_with_no_event": 0,
+   "discrepancies": 0,
+   "participants_with_records": 2264,
+   "flagged_time_lists_stored_uncapped": 0,
+   "source_records_repeated": 0,
+   "elapsed_seconds": 61,
+   "participants_sampled": "all",
+   "empty_as_expected_by_field": {
+    "preview": 40
+   },
+   "by_stage": {
+    "retinal_octa": {
+     "compared": 368400,
+     "matched": 368360,
+     "empty_as_expected": 40,
+     "mismatched": 0,
+     "no_source": 0,
+     "no_event": 0,
+     "fields_compared": [
+      "anatomic_region",
+      "enface_layer",
+      "enface_sop_instance_uid",
+      "flow_cube_file_path",
+      "flow_cube_height",
+      "flow_cube_number_of_frames",
+      "flow_cube_width",
+      "imaging",
+      "laterality",
+      "manufacturer",
+      "manufacturers_model_name",
+      "preview",
+      "segmentation_file_path",
+      "segmentation_sop_instance_uid",
+      "segmentation_type"
+     ]
+    }
+   },
+   "agreement_pct": 100.0,
+   "shards": 8
   },
   "ecg": {
    "values_compared": 63196,
    "matched": 58767,
    "empty_as_expected": 4429,
+   "mismatched": 0,
+   "events_with_no_source_hour": 0,
+   "source_hours_with_no_event": 0,
+   "discrepancies": 0,
+   "participants_with_records": 2251,
+   "flagged_time_lists_stored_uncapped": 0,
+   "source_records_repeated": 0,
+   "elapsed_seconds": 50,
+   "participants_sampled": "all",
    "empty_as_expected_by_field": {
     "ECG Finding 2": 659,
     "ECG Finding 2 Detail": 659,
@@ -95,36 +195,369 @@
     "ECG PR Interval Status": 38,
     "ECG T Axis (deg)": 10
    },
-   "mismatched": 0,
-   "events_with_no_source_hour": 0,
-   "source_hours_with_no_event": 0,
-   "discrepancies": 0,
-   "agreement_pct": 100.0,
-   "participants_sampled": "all",
-   "participants_with_records": 2251,
-   "elapsed_seconds": 52
-  },
-  "retinal_octa": {
-   "values_compared": 368400,
-   "matched": 368360,
-   "empty_as_expected": 40,
-   "empty_as_expected_by_field": {
-    "preview": 40
+   "by_stage": {
+    "ecg": {
+     "compared": 63196,
+     "matched": 58767,
+     "empty_as_expected": 4429,
+     "mismatched": 0,
+     "no_source": 0,
+     "no_event": 0,
+     "fields_compared": [
+      "ECG Device",
+      "ECG Finding 1",
+      "ECG Finding 1 Detail",
+      "ECG Finding 2",
+      "ECG Finding 2 Detail",
+      "ECG Finding 3",
+      "ECG Finding 3 Detail",
+      "ECG Heart Rate (bpm)",
+      "ECG Heart Rate Status",
+      "ECG Machine Interpretation Status",
+      "ECG Machine Interpretation Summary",
+      "ECG Number of Leads",
+      "ECG Number of Samples",
+      "ECG P Axis (deg)",
+      "ECG PR Interval (ms)",
+      "ECG PR Interval Status",
+      "ECG Participant Position",
+      "ECG QRS Axis (deg)",
+      "ECG QRS Duration (ms)",
+      "ECG QRS Duration Status",
+      "ECG QT Interval (ms)",
+      "ECG QTc Interval (ms)",
+      "ECG Raw Data File Path",
+      "ECG Recording Duration (sec)",
+      "ECG Sampling Frequency (Hz)",
+      "ECG Study Visit Date",
+      "ECG T Axis (deg)",
+      "ECG Validation Date"
+     ]
+    }
    },
+   "agreement_pct": 100.0,
+   "shards": 8
+  },
+  "wearable": {
+   "values_compared": 22850292,
+   "matched": 21327531,
+   "empty_as_expected": 1522761,
    "mismatched": 0,
    "events_with_no_source_hour": 0,
    "source_hours_with_no_event": 0,
    "discrepancies": 0,
-   "agreement_pct": 100.0,
+   "participants_with_records": 2169,
+   "flagged_time_lists_stored_uncapped": 0,
+   "source_records_repeated": 268,
+   "elapsed_seconds": 1712,
    "participants_sampled": "all",
-   "participants_with_records": 2264,
-   "elapsed_seconds": 62
+   "empty_as_expected_by_field": {
+    "high_ts": 725695,
+    "low_ts": 755379,
+    "marked_low_ts": 22729,
+    "mild_low_ts": 7090,
+    "sd": 11868
+   },
+   "by_stage": {
+    "Wearable - Activity": {
+     "compared": 3483644,
+     "matched": 3483644,
+     "empty_as_expected": 0,
+     "mismatched": 0,
+     "no_source": 0,
+     "no_event": 0,
+     "fields_compared": [
+      "count",
+      "hour_end",
+      "hour_start",
+      "sum"
+     ]
+    },
+    "Wearable - Calories": {
+     "compared": 1300804,
+     "matched": 1300804,
+     "empty_as_expected": 0,
+     "mismatched": 0,
+     "no_source": 0,
+     "no_event": 0,
+     "fields_compared": [
+      "count",
+      "hour_end",
+      "hour_start",
+      "sum"
+     ]
+    },
+    "Wearable - Heart Rate": {
+     "compared": 6317363,
+     "matched": 5633805,
+     "empty_as_expected": 683558,
+     "mismatched": 0,
+     "no_source": 0,
+     "no_event": 0,
+     "fields_compared": [
+      "count",
+      "high_count",
+      "high_ts",
+      "hour_end",
+      "hour_start",
+      "low_count",
+      "low_ts",
+      "max",
+      "mean",
+      "min",
+      "sd",
+      "status",
+      "sufficiency"
+     ]
+    },
+    "Wearable - Respiratory Rate": {
+     "compared": 6341010,
+     "matched": 5538665,
+     "empty_as_expected": 802345,
+     "mismatched": 0,
+     "no_source": 0,
+     "no_event": 0,
+     "fields_compared": [
+      "count",
+      "high_count",
+      "high_ts",
+      "hour_end",
+      "hour_start",
+      "low_count",
+      "low_ts",
+      "max",
+      "mean",
+      "min",
+      "sd",
+      "status",
+      "sufficiency"
+     ]
+    },
+    "Wearable - Sleep": {
+     "compared": 1583996,
+     "matched": 1583996,
+     "empty_as_expected": 0,
+     "mismatched": 0,
+     "no_source": 0,
+     "no_event": 0,
+     "fields_compared": [
+      "duration_minutes",
+      "hour_end",
+      "hour_start",
+      "stage"
+     ]
+    },
+    "Wearable - SpO2": {
+     "compared": 949013,
+     "matched": 912155,
+     "empty_as_expected": 36858,
+     "mismatched": 0,
+     "no_source": 0,
+     "no_event": 0,
+     "fields_compared": [
+      "count",
+      "hour_end",
+      "hour_start",
+      "marked_low_count",
+      "marked_low_ts",
+      "max",
+      "mean",
+      "mild_low_count",
+      "mild_low_ts",
+      "min",
+      "sd",
+      "status",
+      "sufficiency"
+     ]
+    },
+    "Wearable - Stress": {
+     "compared": 2874462,
+     "matched": 2874462,
+     "empty_as_expected": 0,
+     "mismatched": 0,
+     "no_source": 0,
+     "no_event": 0,
+     "fields_compared": [
+      "count",
+      "hour_end",
+      "hour_start",
+      "max",
+      "mean",
+      "min"
+     ]
+    }
+   },
+   "agreement_pct": 100.0,
+   "shards": 8
+  },
+  "environmental": {
+   "values_compared": 32290670,
+   "matched": 31394150,
+   "empty_as_expected": 896520,
+   "mismatched": 0,
+   "events_with_no_source_hour": 0,
+   "source_hours_with_no_event": 0,
+   "discrepancies": 0,
+   "participants_with_records": 2230,
+   "flagged_time_lists_stored_uncapped": 44616,
+   "source_records_repeated": 0,
+   "elapsed_seconds": 1760,
+   "participants_sampled": "all",
+   "empty_as_expected_by_field": {
+    "above_ts": 379837,
+    "below_ts": 516601,
+    "sd": 82
+   },
+   "by_stage": {
+    "hum": {
+     "compared": 5919969,
+     "matched": 5023521,
+     "empty_as_expected": 896448,
+     "mismatched": 0,
+     "no_source": 0,
+     "no_event": 0,
+     "fields_compared": [
+      "above_count",
+      "above_ts",
+      "below_count",
+      "below_ts",
+      "count",
+      "hour_end",
+      "hour_start",
+      "max",
+      "mean",
+      "min",
+      "sd"
+     ]
+    },
+    "nox": {
+     "compared": 3767183,
+     "matched": 3767171,
+     "empty_as_expected": 12,
+     "mismatched": 0,
+     "no_source": 0,
+     "no_event": 0,
+     "fields_compared": [
+      "count",
+      "hour_end",
+      "hour_start",
+      "max",
+      "mean",
+      "min",
+      "sd"
+     ]
+    },
+    "pm1": {
+     "compared": 3767253,
+     "matched": 3767243,
+     "empty_as_expected": 10,
+     "mismatched": 0,
+     "no_source": 0,
+     "no_event": 0,
+     "fields_compared": [
+      "count",
+      "hour_end",
+      "hour_start",
+      "max",
+      "mean",
+      "min",
+      "sd"
+     ]
+    },
+    "pm10": {
+     "compared": 3767253,
+     "matched": 3767243,
+     "empty_as_expected": 10,
+     "mismatched": 0,
+     "no_source": 0,
+     "no_event": 0,
+     "fields_compared": [
+      "count",
+      "hour_end",
+      "hour_start",
+      "max",
+      "mean",
+      "min",
+      "sd"
+     ]
+    },
+    "pm2.5": {
+     "compared": 3767253,
+     "matched": 3767243,
+     "empty_as_expected": 10,
+     "mismatched": 0,
+     "no_source": 0,
+     "no_event": 0,
+     "fields_compared": [
+      "count",
+      "hour_end",
+      "hour_start",
+      "max",
+      "mean",
+      "min",
+      "sd"
+     ]
+    },
+    "pm4": {
+     "compared": 3767253,
+     "matched": 3767243,
+     "empty_as_expected": 10,
+     "mismatched": 0,
+     "no_source": 0,
+     "no_event": 0,
+     "fields_compared": [
+      "count",
+      "hour_end",
+      "hour_start",
+      "max",
+      "mean",
+      "min",
+      "sd"
+     ]
+    },
+    "temp": {
+     "compared": 3767253,
+     "matched": 3767243,
+     "empty_as_expected": 10,
+     "mismatched": 0,
+     "no_source": 0,
+     "no_event": 0,
+     "fields_compared": [
+      "count",
+      "hour_end",
+      "hour_start",
+      "max",
+      "mean",
+      "min",
+      "sd"
+     ]
+    },
+    "voc": {
+     "compared": 3767253,
+     "matched": 3767243,
+     "empty_as_expected": 10,
+     "mismatched": 0,
+     "no_source": 0,
+     "no_event": 0,
+     "fields_compared": [
+      "count",
+      "hour_end",
+      "hour_start",
+      "max",
+      "mean",
+      "min",
+      "sd"
+     ]
+    }
+   },
+   "agreement_pct": 100.0,
+   "shards": 8
   }
  },
  "totals": {
-  "values_compared": 16026073,
-  "matched": 16021396,
-  "empty_as_expected": 4677,
+  "values_compared": 64850380,
+  "matched": 61478490,
+  "empty_as_expected": 3371890,
   "mismatched": 0,
   "events_with_no_source_hour": 0,
   "source_hours_with_no_event": 0,

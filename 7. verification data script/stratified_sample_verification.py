@@ -67,6 +67,15 @@ Thin strata. Proportional allocation gave electrocardiograms one draw and
       allocated across the three hourly groups only, with a floor of
       MIN_PER_GROUP per group.
 
+Coverage. Activity, Calories and Sleep were never compared, and on the other
+      hourly stages only the summary statistics were: 4 of 13 wearable fields,
+      10 of 16 glucose fields, 5 of 7 environmental fields. Every hourly stage
+      and every field it stores is now compared (thresholds, statuses, lists
+      of flagged times, hour start and end), and --exhaustive checks every
+      participant rather than a sample. A second event for an hour already
+      matched now counts as an event with no source record, and sleep
+      segments the export repeats are paired one to one.
+
 Diagnosis pairing. Events were matched to the first source row with the same
       code, so a code recurring on two dates was compared against the wrong
       row. Both sides are now sorted within a code and paired in order.
@@ -106,17 +115,25 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
 
 from common import aireadi, dhis2  # noqa: E402
 from common import metadata_uids as M  # noqa: E402
-from common.timeutil import hour_key  # noqa: E402
+from common.timeutil import hour_end, hour_key, parse_instant, time_only  # noqa: E402
 
 from hourly_aggregation_logic_final import (  # noqa: E402
-    aggregate_glucose, aggregate_simple, extract_heart_rate,
-    extract_oxygen_saturation, extract_respiratory_rate, extract_stress,
+    aggregate_activity, aggregate_calories, aggregate_glucose, aggregate_simple,
+    extract_heart_rate, extract_oxygen_saturation, extract_respiratory_rate,
+    extract_sleep_segments, extract_stress,
+)
+from threshold_step1_metadata import (  # noqa: E402
+    FIELD_NAMES as THRESHOLD_FIELD_NAMES, HR_THRESHOLDS, RR_THRESHOLDS,
+)
+from threshold_step2_backfill import compute_hr_rr, compute_spo2  # noqa: E402
+from glucose_recount_step2_backfill import (  # noqa: E402
+    classify as classify_glucose, extract_raw as extract_raw_glucose,
 )
 from ecg_step1_metadata import (  # noqa: E402
     HR_RANGE, PR_RANGE, QRS_STATUS_SET, QRS_WIDENED_AT, RANGE_STATUS_SET,
 )
 from env_aggregation_logic_v2 import (  # noqa: E402
-    RELEVANT_COLUMNS, aggregate_env_column, read_env_csv,
+    RELEVANT_COLUMNS, THRESHOLDS as ENV_THRESHOLDS, aggregate_env_column, read_env_csv,
 )
 
 CHECKPOINT_FILE = "stratified_sample_checkpoint.json"
@@ -138,16 +155,31 @@ PRIOR_CORE_REGISTRY = {
     "verified_by_this_script": False,
 }
 
+# stream: (manifest column, extractor, stage, threshold metric or None)
 CONTINUOUS_WEARABLE = {
-    "heart_rate": ("heartrate_filepath", extract_heart_rate, "Wearable - Heart Rate"),
+    "heart_rate": ("heartrate_filepath", extract_heart_rate, "Wearable - Heart Rate", "HR"),
     "respiratory_rate": ("respiratory_rate_filepath", extract_respiratory_rate,
-                         "Wearable - Respiratory Rate"),
-    "spo2": ("oxygen_saturation_filepath", extract_oxygen_saturation, "Wearable - SpO2"),
-    "stress": ("stress_level_filepath", extract_stress, "Wearable - Stress"),
+                         "Wearable - Respiratory Rate", "RR"),
+    "spo2": ("oxygen_saturation_filepath", extract_oxygen_saturation, "Wearable - SpO2",
+             "SPO2"),
+    "stress": ("stress_level_filepath", extract_stress, "Wearable - Stress", None),
 }
+# stage: (manifest column, aggregator, sum element, count element)
+SEGMENT_WEARABLE = {
+    "Wearable - Activity": ("physical_activity_filepath", aggregate_activity,
+                            "Steps Sum", "Steps Reading Count"),
+    "Wearable - Calories": ("active_calories_filepath", aggregate_calories,
+                            "Calories Sum", "Calories Reading Count"),
+}
+SLEEP_STAGE = "Wearable - Sleep"
+WEARABLE_STAGES = ([s for _, _, s, _ in CONTINUOUS_WEARABLE.values()]
+                   + list(SEGMENT_WEARABLE) + [SLEEP_STAGE])
 
-GLUCOSE_COMPARED = ["mean", "min", "max", "count", "sd",
-                    "tir_pct", "tar_pct", "tbr_pct", "high_count", "low_count"]
+# Lists of flagged-reading times. Empty by rule when no reading of the hour
+# falls in that class.
+TIMESTAMP_FIELDS = {"low_ts", "high_ts", "mild_low_ts", "marked_low_ts",
+                    "above_ts", "below_ts"}
+HOUR_FIELDS = {"hour_start", "hour_end"}
 
 RETINAL_PHOTOGRAPHY_COLUMNS = [
     "manufacturer", "manufacturers_model_name", "laterality", "anatomic_region",
@@ -216,6 +248,12 @@ class Tally:
         self.unmatched_events = 0
         self.unmatched_source = 0
         self.participants_checked = 0
+        # Humidity lists stored in full before the 20-entry cap; see compare_keyed.
+        self.legacy_uncapped = 0
+        # Source records repeated verbatim in the export (sleep segments).
+        self.source_repeats = 0
+        # Per-stage counts and the fields seen, for the coverage table.
+        self.by_stage = {}
         # Every mismatch, with enough context to see why. Written to
         # MISMATCH_FILE at the end of the run so that a discrepancy can be
         # traced to its cause without re-running the aggregation.
@@ -233,6 +271,20 @@ class Tally:
     def total_compared(self):
         return self.checked + self.unmatched_events + self.unmatched_source
 
+    def _stage(self, stage):
+        return self.by_stage.setdefault(stage or self.group, {
+            "compared": 0, "matched": 0, "empty_as_expected": 0, "mismatched": 0,
+            "no_source": 0, "no_event": 0, "fields": set(),
+        })
+
+    def note_unmatched(self, stage, events=0, source=0):
+        """Count events with no source record, and source records with no event."""
+        self.unmatched_events += events
+        self.unmatched_source += source
+        entry = self._stage(stage)
+        entry["no_source"] += events
+        entry["no_event"] += source
+
     def compare(self, dhis2_value, source_value, expect_empty=False, **context):
         """Count one value pair.
 
@@ -243,14 +295,20 @@ class Tally:
         counts are kept so that a field which is empty everywhere, the mark
         of a parser reading the wrong key, stands out in the summary.
         """
+        entry = self._stage(context.get("stage"))
+        entry["compared"] += 1
+        entry["fields"].add(context.get("field") or "-")
         if expect_empty and is_empty(dhis2_value) and is_empty(source_value):
             self.empty_as_expected += 1
+            entry["empty_as_expected"] += 1
             field = context.get("field") or "-"
             self.empty_by_field[field] = self.empty_by_field.get(field, 0) + 1
         elif close_enough(dhis2_value, source_value):
             self.matched += 1
+            entry["matched"] += 1
         else:
             self.mismatched += 1
+            entry["mismatched"] += 1
             self.mismatches.append({
                 "group": self.group, "dhis2": dhis2_value,
                 "source": None if is_empty(source_value) else str(source_value),
@@ -271,6 +329,13 @@ class Tally:
             "source_hours_with_no_event": self.unmatched_source,
             "discrepancies": self.discrepancies,
             "agreement_pct": round(rate, 4) if rate is not None else None,
+            "flagged_time_lists_stored_uncapped": self.legacy_uncapped,
+            "source_records_repeated": self.source_repeats,
+            "by_stage": {
+                stage: {**{k: v for k, v in entry.items() if k != "fields"},
+                        "fields_compared": sorted(entry["fields"])}
+                for stage, entry in sorted(self.by_stage.items())
+            },
         }
 
 
@@ -358,109 +423,280 @@ def event_value(event, de_uid):
     return None
 
 
-def index_by_hour(hourly):
-    """{hour_key: stats}. M-03: built once instead of scanned per event."""
-    return {hour_key(k): v for k, v in hourly.items()}
+def hour_text(value):
+    """The UTC minute 'YYYY-MM-DD HH:MM' held by the Hour Start and Hour End fields."""
+    return parse_instant(value).strftime("%Y-%m-%d %H:%M")
 
 
-def compare_hourly(tally, events, source_hourly, field_uids, stage=None, pid=None,
-                   undefined=None):
-    """Compare one stage's events against one aggregated source series.
+def stored_hour_text(value):
+    """A stored hour field without the ' UTC' label that later loads append.
 
-    undefined(field, stats) says which statistics the source hour cannot
-    have, so that an empty pair there counts as agreement. See Tally.compare.
+    Events loaded before the label existed hold the same minute without it,
+    so both forms are compared as the same UTC minute.
     """
-    indexed = index_by_hour(source_hourly)
-    seen = set()
+    if is_empty(value):
+        return value
+    text = str(value).strip()
+    return text[:-4].strip() if text.endswith(" UTC") else text
 
+
+def instant_key(value):
+    """Key for an event that is not hourly, such as a sleep segment."""
+    return parse_instant(value).isoformat()
+
+
+def compare_keyed(tally, events, expected, field_uids, event_key, stage, pid,
+                  undefined=None, order_fields=()):
+    """Compare every stored field of one stage's events with the source.
+
+    expected maps a key (an hour, or a segment's start instant) to the value
+    of every field the importers write for it, or to a list of them where the
+    source itself repeats a record. event_key gives the key of a stored event.
+    Events and source records sharing a key are sorted on order_fields and
+    paired one to one; an event left over is counted as having no source
+    record, so a duplicate cannot hide behind its twin, and a source record
+    left over as having no event. An empty pair is agreement only where
+    undefined(field, stats) says the statistic has no value, or for a list of
+    flagged times whose class holds no reading. See Tally.compare.
+    """
+    def wanted(key):
+        value = expected.get(key)
+        return value if isinstance(value, list) else ([value] if value is not None else [])
+
+    by_key = {}
     for event in events:
         occurred = event.get("occurredAt")
-        if not occurred:
-            tally.unmatched_events += 1
-            continue
-        key = hour_key(occurred)
-        stats = indexed.get(key)
-        if stats is None:
-            tally.unmatched_events += 1
-            continue
-        seen.add(key)
-        for field, de_uid in field_uids.items():
-            tally.compare(event_value(event, de_uid), stats.get(field),
-                          expect_empty=bool(undefined and undefined(field, stats)),
-                          stage=stage, pid=pid, hour=occurred, field=field,
-                          source_count=stats.get("count"))
+        by_key.setdefault(event_key(occurred) if occurred else None, []).append(event)
 
-    # H-11: a source hour that produced no event is also a discrepancy.
-    tally.unmatched_source += len(set(indexed) - seen)
+    no_source = no_event = 0
+    for key, stored_events in by_key.items():
+        sources = wanted(key)
+        stored_events = sorted(stored_events, key=lambda e: tuple(
+            str(event_value(e, field_uids[f]) or "") for f in order_fields))
+        sources = sorted(sources, key=lambda s: tuple(str(s.get(f) or "") for f in order_fields))
+        no_source += max(0, len(stored_events) - len(sources))
+        no_event += max(0, len(sources) - len(stored_events))
+        for event, stats in zip(stored_events, sources):
+            occurred = event.get("occurredAt")
+            for field, de_uid in field_uids.items():
+                stored = event_value(event, de_uid)
+                if field in HOUR_FIELDS:
+                    stored = stored_hour_text(stored)
+                value = stats.get(field)
+                # Humidity hours loaded before the 20-entry cap hold the full
+                # list of flagged times; that list is the source too.
+                if (field in TIMESTAMP_FIELDS and not close_enough(stored, value)
+                        and not is_empty(stored) and stored == stats.get(field + "_full")):
+                    value = stored
+                    tally.legacy_uncapped += 1
+                expect_empty = ((field in TIMESTAMP_FIELDS and is_empty(value))
+                                or bool(undefined and undefined(field, stats)))
+                tally.compare(stored, value, expect_empty=expect_empty, stage=stage,
+                              pid=pid, hour=occurred, field=field,
+                              source_count=stats.get("count"))
+    no_event += sum(len(wanted(k)) for k in expected if k not in by_key)
+    tally.note_unmatched(stage, events=no_source, source=no_event)
 
 
 # ---------------------------------------------------------------------------
 # Per-domain verification
 # ---------------------------------------------------------------------------
 
-def verify_wearable(session, registry, n, participants):
+def hourly_participants(group, n, participants, exhaustive):
+    return every_participant(participants) if exhaustive else sample_participants(
+        group, n, participants)
+
+
+def resolve_one(modality, rows, column):
+    """The single source file for a column; no participant has two periods."""
+    for row in rows:
+        path = aireadi.resolve(modality, row.get(column))
+        if path:
+            return path
+    return None
+
+
+def hour_fields(registry):
+    return {"hour_start": registry.data_element("Hour Start"),
+            "hour_end": registry.data_element("Hour End")}
+
+
+def with_hours(stats, hour):
+    return dict(stats, hour_start=hour_text(hour), hour_end=hour_text(hour_end(hour)))
+
+
+def expected_continuous(readings, metric):
+    """Every stored field of a continuous stream: the summary, hours and thresholds."""
+    by_hour = {}
+    for ts, value in readings:
+        by_hour.setdefault(hour_key(ts), []).append((ts, value))
+    expected = {}
+    for hour, stats in aggregate_simple(readings).items():
+        key = hour_key(hour)
+        entry = with_hours(stats, hour)
+        if metric == "HR":
+            entry.update(compute_hr_rr(by_hour[key], *HR_THRESHOLDS))
+        elif metric == "RR":
+            entry.update(compute_hr_rr(by_hour[key], *RR_THRESHOLDS))
+        elif metric == "SPO2":
+            entry.update(compute_spo2(by_hour[key]))
+        expected[key] = entry
+    return expected
+
+
+def expected_sleep(path):
+    """Every stored field of each sleep segment, keyed by its start instant."""
+    expected = {}
+    for start, sleep_stage, minutes in extract_sleep_segments(path):
+        begin = parse_instant(start)
+        expected.setdefault(instant_key(begin), []).append({
+            "stage": sleep_stage, "duration_minutes": minutes,
+            "hour_start": hour_text(begin),
+            "hour_end": hour_text(begin + dt.timedelta(minutes=minutes)),
+        })
+    return expected
+
+
+def verify_wearable(session, registry, participants, n=None, exhaustive=False):
+    """All seven wearable stages, every field each stage stores."""
     manifest = aireadi.load_manifest("wearable_activity_monitor")
-    shared = registry.wearable_shared_uids()
+    hours = hour_fields(registry)
     tally = Tally("wearable")
 
-    for tei, pid in sample_participants("wearable", n, participants):
+    continuous_fields = {}
+    for _, (_, _, stage_name, metric) in CONTINUOUS_WEARABLE.items():
+        fields = dict(registry.wearable_shared_uids(), **hours)
+        if metric:
+            fields.update({k: registry.data_element(name)
+                           for k, name in THRESHOLD_FIELD_NAMES[metric].items()})
+        continuous_fields[stage_name] = fields
+    segment_fields = {
+        stage_name: dict({"sum": registry.data_element(sum_name),
+                          "count": registry.data_element(count_name)}, **hours)
+        for stage_name, (_, _, sum_name, count_name) in SEGMENT_WEARABLE.items()
+    }
+    sleep_fields = dict({"stage": registry.data_element("Sleep Stage"),
+                         "duration_minutes": registry.data_element(
+                             "Sleep Segment Duration Minutes")}, **hours)
+
+    for tei, pid in hourly_participants("wearable", n, participants, exhaustive):
         rows = manifest.get(pid, [])
-        for _, (column, extractor, stage_name) in CONTINUOUS_WEARABLE.items():
-            # M-11: every manifest row, not just the first.
-            readings = []
-            for row in rows:
-                path = aireadi.resolve("wearable_activity_monitor", row.get(column))
-                if path:
-                    readings.extend(extractor(path))
-            if not readings:
-                continue
-            events = dhis2.fetch_events(
-                session, M.PROGRAM_UID, registry.stage(stage_name), tei
-            )
-            compare_hourly(tally, events, aggregate_simple(readings), shared,
-                           stage=stage_name, pid=pid)
+        checked = False
+        for _, (column, extractor, stage_name, metric) in CONTINUOUS_WEARABLE.items():
+            path = resolve_one("wearable_activity_monitor", rows, column)
+            expected = expected_continuous(extractor(path), metric) if path else {}
+            events = dhis2.fetch_events(session, M.PROGRAM_UID, registry.stage(stage_name), tei)
+            checked |= bool(expected or events)
+            compare_keyed(tally, events, expected, continuous_fields[stage_name],
+                          hour_key, stage_name, pid, undefined=sd_undefined)
+        for stage_name, (column, aggregate, _, _) in SEGMENT_WEARABLE.items():
+            path = resolve_one("wearable_activity_monitor", rows, column)
+            expected = ({hour_key(h): with_hours(s, h) for h, s in aggregate(path).items()}
+                        if path else {})
+            events = dhis2.fetch_events(session, M.PROGRAM_UID, registry.stage(stage_name), tei)
+            checked |= bool(expected or events)
+            compare_keyed(tally, events, expected, segment_fields[stage_name],
+                          hour_key, stage_name, pid)
+        path = resolve_one("wearable_activity_monitor", rows, "sleep_filepath")
+        expected = expected_sleep(path) if path else {}
+        # The Garmin export repeats some segments verbatim; the importer
+        # loaded each repeat, so they are paired one to one and counted.
+        tally.source_repeats += sum(len(v) - 1 for v in expected.values())
+        events = dhis2.fetch_events(session, M.PROGRAM_UID, registry.stage(SLEEP_STAGE), tei)
+        checked |= bool(expected or events)
+        compare_keyed(tally, events, expected, sleep_fields, instant_key, SLEEP_STAGE, pid,
+                      order_fields=("stage", "duration_minutes"))
+        tally.participants_checked += checked
     return tally
 
 
-def verify_glucose(session, registry, n, participants):
+def expected_glucose(path):
+    """Every stored glucose field: statistics, hours and the clinical-range lists."""
+    raw_by_hour = {}
+    for ts, value in extract_raw_glucose(path):
+        raw_by_hour.setdefault(hour_key(ts), []).append((ts, value))
+    expected = {}
+    for hour, stats in aggregate_glucose(path).items():
+        key = hour_key(hour)
+        above, below = classify_glucose(raw_by_hour.get(key, []))
+        expected[key] = dict(
+            with_hours(stats, hour),
+            above_ts=", ".join(time_only(t) for t in sorted(above)) or None,
+            below_ts=", ".join(time_only(t) for t in sorted(below)) or None,
+            above_count=len(above), below_count=len(below),
+        )
+    return expected
+
+
+def verify_glucose(session, registry, participants, n=None, exhaustive=False):
+    """The CGM glucose stage, all 16 fields."""
     manifest = aireadi.load_manifest("wearable_blood_glucose")
-    field_uids = {k: M.GLUCOSE_FIELD_UIDS[k] for k in GLUCOSE_COMPARED}
+    field_uids = dict(M.GLUCOSE_FIELD_UIDS, **hour_fields(registry))
     stage_uid = registry.stage("CGM - Glucose")
     tally = Tally("glucose")
 
-    for tei, pid in sample_participants("glucose", n, participants):
-        for row in manifest.get(pid, []):
-            path = aireadi.resolve("wearable_blood_glucose", row.get("glucose_filepath"))
-            if not path:
-                continue
-            events = dhis2.fetch_events(session, M.PROGRAM_UID, stage_uid, tei)
-            compare_hourly(tally, events, aggregate_glucose(path), field_uids,
-                           stage="CGM - Glucose", pid=pid, undefined=glucose_undefined)
+    for tei, pid in hourly_participants("glucose", n, participants, exhaustive):
+        path = resolve_one("wearable_blood_glucose", manifest.get(pid, []), "glucose_filepath")
+        expected = expected_glucose(path) if path else {}
+        events = dhis2.fetch_events(session, M.PROGRAM_UID, stage_uid, tei)
+        tally.participants_checked += bool(expected or events)
+        compare_keyed(tally, events, expected, field_uids, hour_key, "CGM - Glucose",
+                      pid, undefined=glucose_undefined)
     return tally
 
 
-def verify_environmental(session, registry, n, participants):
+HUMIDITY_LIST_FIELDS = {
+    "above_ts": ("Humidity Above Comfort Range (>50%) - Timestamps", "above"),
+    "below_ts": ("Humidity Below Comfort Range (<30%) - Timestamps", "below"),
+}
+
+
+def expected_environment(rows, column):
+    """Every stored field of one channel, with the full flagged-time lists too."""
+    expected = {}
+    thresholds = ENV_THRESHOLDS.get(column, {})
+    for hour, stats in aggregate_env_column(rows, column).items():
+        expected[hour_key(hour)] = with_hours(stats, hour)
+    if thresholds:
+        flagged = {}
+        for row in rows:
+            if column not in row:
+                continue
+            value = row[column]
+            for side, limit in thresholds.items():
+                if (side == "above" and value > limit) or (side == "below" and value < limit):
+                    flagged.setdefault((hour_key(row["ts"]), side), []).append(row["ts"])
+        for (key, side), times in flagged.items():
+            expected[key][f"{side}_ts_full"] = ", ".join(time_only(t) for t in sorted(times))
+    return expected
+
+
+def verify_environmental(session, registry, participants, n=None, exhaustive=False):
+    """All eight channels, every field each stage stores."""
     manifest = aireadi.load_manifest("environment")
     base = registry.env_field_uids()
-    compared = {k: base[k] for k in ("mean", "min", "max", "sd", "count")}
+    humidity = dict(base, **M.ENV_HUMIDITY_EXTRA_UIDS)
+    for key, (name, _) in HUMIDITY_LIST_FIELDS.items():
+        humidity[key] = registry.data_element(name)
     tally = Tally("environmental")
 
-    for tei, pid in sample_participants("environmental", n, participants):
+    for tei, pid in hourly_participants("environmental", n, participants, exhaustive):
         rows = []
-        for row in manifest.get(pid, []):
-            path = aireadi.resolve("environment", row.get("env_sensor_filepath"))
-            if path:
-                rows.extend(read_env_csv(path))
-        if not rows:
-            continue
+        path = resolve_one("environment", manifest.get(pid, []), "env_sensor_filepath")
+        if path:
+            rows = read_env_csv(path)
+        checked = False
         # H-14: every column including nox. A participant whose nox column is
         # all nan simply produces no buckets, which read_env_csv handles.
         for column in RELEVANT_COLUMNS:
+            expected = expected_environment(rows, column) if rows else {}
             events = dhis2.fetch_events(
                 session, M.PROGRAM_UID, registry.environment_stage(column), tei
             )
-            compare_hourly(tally, events, aggregate_env_column(rows, column), compared,
-                           stage=column, pid=pid, undefined=sd_undefined)
+            checked |= bool(expected or events)
+            compare_keyed(tally, events, expected, humidity if column == "hum" else base,
+                          hour_key, column, pid, undefined=sd_undefined)
+        tally.participants_checked += checked
     return tally
 
 
@@ -826,6 +1062,49 @@ def record_mismatches(group, mismatches):
         json.dump(existing, fh, indent=1)
 
 
+
+SUMMED = ("values_compared", "matched", "empty_as_expected", "mismatched",
+          "events_with_no_source_hour", "source_hours_with_no_event", "discrepancies",
+          "participants_with_records", "flagged_time_lists_stored_uncapped",
+          "source_records_repeated")
+
+
+def merge_checkpoints(paths):
+    """Sum the per-group results of shard runs into one set of results.
+
+    Every count adds across shards because each participant is in exactly
+    one shard. Elapsed time is the longest shard, since they ran side by side.
+    """
+    merged = {}
+    for path in paths:
+        with open(path) as fh:
+            results = json.load(fh)["results"]
+        for group, r in results.items():
+            m = merged.setdefault(group, {k: 0 for k in SUMMED})
+            for key in SUMMED:
+                m[key] += r.get(key) or 0
+            m["elapsed_seconds"] = max(m.get("elapsed_seconds", 0), r.get("elapsed_seconds", 0))
+            m["participants_sampled"] = r.get("participants_sampled")
+            fields = m.setdefault("empty_as_expected_by_field", {})
+            for f, n in r.get("empty_as_expected_by_field", {}).items():
+                fields[f] = fields.get(f, 0) + n
+            stages = m.setdefault("by_stage", {})
+            for stage, e in r.get("by_stage", {}).items():
+                s = stages.setdefault(stage, {"compared": 0, "matched": 0, "empty_as_expected": 0,
+                                              "mismatched": 0, "no_source": 0, "no_event": 0,
+                                              "fields_compared": []})
+                for key in ("compared", "matched", "empty_as_expected", "mismatched",
+                            "no_source", "no_event"):
+                    s[key] += e.get(key, 0)
+                s["fields_compared"] = sorted(set(s["fields_compared"]) | set(e["fields_compared"]))
+    for m in merged.values():
+        agreed = m["matched"] + m["empty_as_expected"]
+        m["agreement_pct"] = (round(100 * agreed / m["values_compared"], 4)
+                              if m["values_compared"] else None)
+        m["shards"] = len(paths)
+    return merged
+
+
 def mismatch_kind(m):
     if is_empty(m.get("dhis2")) and is_empty(m.get("source")):
         return "empty on both sides, unexpected"
@@ -896,6 +1175,13 @@ def main():
     parser.add_argument("--record-limit", type=int,
                         help="check only the first N participants of each per-record "
                              "group; for trying the script out, not for results")
+    parser.add_argument("--exhaustive", action="store_true",
+                        help="check every participant in the hourly groups too")
+    parser.add_argument("--shard", help="K/N: check every N-th participant from K, so N "
+                        "copies can run side by side in separate directories")
+    parser.add_argument("--merge", nargs="+", metavar="CHECKPOINT",
+                        help="combine shard checkpoints into this directory's results, "
+                             "then report as usual")
     parser.add_argument("--fresh", action="store_true", help="ignore the checkpoint")
     args, _ = parser.parse_known_args()
 
@@ -903,7 +1189,7 @@ def main():
     registry = M.load(session)
 
     hourly_stages = {
-        "wearable": [s for _, _, s in CONTINUOUS_WEARABLE.values()],
+        "wearable": WEARABLE_STAGES,
         "glucose": ["CGM - Glucose"],
         "environmental": [
             "Environment - PM1", "Environment - PM2.5", "Environment - PM4",
@@ -918,8 +1204,15 @@ def main():
 
     participants = get_participants(session)
     print(f"Participants in the registry: {len(participants)}")
+    if args.shard:
+        k, n = (int(x) for x in args.shard.split("/"))
+        participants = sorted(participants)[k::n]
+        print(f"Shard {k}/{n}: {len(participants)} participants")
 
-    if args.fixed_n:
+    if args.exhaustive:
+        sizes = {g: None for g in HOURLY_GROUPS}
+        allocation = "every participant"
+    elif args.fixed_n:
         sizes = {g: args.fixed_n for g in HOURLY_GROUPS}
         allocation = f"fixed {args.fixed_n} participants per hourly group"
     else:
@@ -938,10 +1231,12 @@ def main():
                           f"target {args.target_total} participants, "
                           f"floor {args.min_per_group} per group")
         sizes = {g: max(n, args.min_per_group) for g, n in sizes.items()}
-    method = (f"hourly groups: stratified random sampling without replacement, "
-              f"{allocation}, independent seed per group derived from base seed "
-              f"{BASE_SEED}; per-record groups: every participant, every event, "
-              f"every mapped field; tolerance 0.01; an empty pair counts as "
+    hourly_method = ("every participant, every event, every stored field" if args.exhaustive
+                     else f"stratified random sampling without replacement, {allocation}, "
+                          f"independent seed per group derived from base seed {BASE_SEED}, "
+                          f"every stored field")
+    method = (f"hourly groups: {hourly_method}; per-record groups: every participant, "
+              f"every event, every mapped field; tolerance 0.01; an empty pair counts as "
               f"agreement only where a rule on the source says the value must be "
               f"empty, and is reported separately; events with no source "
               f"record and source records with no event are counted separately")
@@ -958,12 +1253,29 @@ def main():
             print(f"[checkpoint] {group} was counted under the old empty-pair rule; re-running")
             del checkpoint["results"][group]
 
+    if args.merge:
+        checkpoint = {"results": merge_checkpoints(args.merge)}
+        with open(CHECKPOINT_FILE, "w") as fh:
+            json.dump(checkpoint, fh, indent=2)
+        mismatches = {}
+        for path in args.merge:
+            other = os.path.join(os.path.dirname(os.path.abspath(path)), MISMATCH_FILE)
+            if os.path.exists(other):
+                with open(other) as fh:
+                    for group, items in json.load(fh).items():
+                        mismatches.setdefault(group, []).extend(items)
+        with open(MISMATCH_FILE, "w") as fh:
+            json.dump(mismatches, fh, indent=1)
+        print(f"Merged {len(args.merge)} checkpoint(s): {sorted(checkpoint['results'])}")
+
     limit = args.record_limit
     verifiers = {
-        "wearable": lambda: verify_wearable(session, registry, sizes["wearable"], participants),
-        "glucose": lambda: verify_glucose(session, registry, sizes["glucose"], participants),
+        "wearable": lambda: verify_wearable(
+            session, registry, participants, sizes["wearable"], args.exhaustive),
+        "glucose": lambda: verify_glucose(
+            session, registry, participants, sizes["glucose"], args.exhaustive),
         "environmental": lambda: verify_environmental(
-            session, registry, sizes["environmental"], participants),
+            session, registry, participants, sizes["environmental"], args.exhaustive),
         "diagnosis": lambda: verify_diagnosis(session, registry, participants, limit),
         "retinal_photography": lambda: verify_retinal_photography(
             session, registry, participants, limit),
@@ -976,14 +1288,15 @@ def main():
         if group in checkpoint["results"]:
             print(f"[resume] {group} already done")
             continue
-        exhaustive = group in RECORD_GROUPS
+        exhaustive = group in RECORD_GROUPS or args.exhaustive
         print(f"\n[run] {group}, " + (f"all participants (limit {limit})" if exhaustive
                                      else f"n={sizes[group]}"))
         group_start = time.time()
         tally = verifiers[group]()
         result = tally.as_dict()
         if exhaustive:
-            result["participants_sampled"] = "all" if not limit else f"first {limit}"
+            result["participants_sampled"] = (
+                f"first {limit}" if limit and group in RECORD_GROUPS else "all")
             result["participants_with_records"] = tally.participants_checked
         else:
             result["participants_sampled"] = sizes[group]
@@ -1025,7 +1338,7 @@ def main():
             print(f"  empty as expected, {group}: {r['empty_as_expected_by_field']}")
 
     breakdown = summarise_mismatches()
-    if not args.groups and not args.record_limit and not args.fixed_n:
+    if not args.groups and not args.record_limit and not args.fixed_n and not args.shard:
         write_results(session, results, method, breakdown)
 
     # H-12: reported next to the sampled result, never merged into it.

@@ -1,0 +1,67 @@
+{
+ "run_date": "2026-10-30",
+ "script": "7. verification data script/flags_and_wear_summary.py",
+ "cgm_wear_days": {
+  "participants": 2245,
+  "by_whole_days": {
+   "2": 8,
+   "3": 5,
+   "4": 6,
+   "5": 9,
+   "6": 11,
+   "7": 20,
+   "8": 25,
+   "9": 47,
+   "10": 189,
+   "11": 1914,
+   "12": 6,
+   "13": 3,
+   "14": 1,
+   "15": 1
+  }
+ },
+ "status_prevalence": {
+  "Wearable - Heart Rate": {
+   "Within range": 201754,
+   "Low readings present": 123109,
+   "High readings present": 154843,
+   "Both low and high readings present": 6245,
+   "Insufficient data": 0,
+   "all hours": 485951
+  },
+  "Wearable - Respiratory Rate": {
+   "Within range": 316732,
+   "Low readings present": 84100,
+   "High readings present": 82050,
+   "Both low and high readings present": 4888,
+   "Insufficient data": 0,
+   "all hours": 487770
+  },
+  "Wearable - SpO2": {
+   "Expected range only": 3507,
+   "Mild-low readings present": 19222,
+   "Marked-low readings present": 3583,
+   "Both mild-low and marked-low readings present": 46689,
+   "Insufficient data": 0,
+   "all hours": 73001
+  }
+ },
+ "worked_example_tir_below_70_by_site": {
+  "sites": {
+   "University of Alabama at Birmingham": {
+    "hours_tir_below_70": 33821,
+    "all_hours": 179121
+   },
+   "University of California San Diego": {
+    "hours_tir_below_70": 20981,
+    "all_hours": 155017
+   },
+   "University of Washington": {
+    "hours_tir_below_70": 24434,
+    "all_hours": 185479
+   }
+  },
+  "requests": 6,
+  "seconds": 27.3
+ }
+}

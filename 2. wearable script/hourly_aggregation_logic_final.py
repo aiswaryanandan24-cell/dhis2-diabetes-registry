@@ -155,10 +155,19 @@ def aggregate_calories(fp):
 # ---------------- Sleep: raw segments, not hourly aggregated ----------------
 
 def extract_sleep_segments(fp):
-    """One (start_ts, stage, duration_minutes) tuple per raw sleep segment."""
+    """One (start_ts, stage, duration_minutes) tuple per distinct sleep segment.
+
+    The Garmin export repeats segments verbatim: across the 2,184 AI-READI
+    sleep files, 169,960 of 565,959 segments are exact copies of another
+    (same start, stage and duration), in 1,567 participants, and summing
+    them overstates sleep time by about 43%. Exact repeats are dropped here,
+    keeping the first. Segments that share a start but differ in stage or
+    duration are kept, since nothing says which one is right. A segment
+    that ends before it starts (9 in the release) is dropped too.
+    """
     data = _load(fp)
     valid_stages = {"awake", "light", "deep", "rem"}
-    out = []
+    out, seen = [], set()
     for r in data["body"]["sleep"]:
         stage = r.get("sleep_stage_state")
         if stage not in valid_stages:
@@ -169,7 +178,11 @@ def extract_sleep_segments(fp):
         duration = (end - start).total_seconds() / 60
         if not is_finite_number(duration) or duration < 0:
             continue
-        out.append((tf["start_date_time"], stage, round(duration, 1)))
+        segment = (tf["start_date_time"], stage, round(duration, 1))
+        if segment in seen:
+            continue
+        seen.add(segment)
+        out.append(segment)
     return out
 
 
